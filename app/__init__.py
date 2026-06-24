@@ -36,22 +36,46 @@ def create_app(config_name=None):
     app.config["CORS_ORIGINS"] = cors_origins
     logging.info("CORS origins: %s", cors_origins)
 
+    cors_allow_headers = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+    cors_allow_methods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+
     CORS(
         app,
-        origins=cors_origins,
+        resources={r"/api/*": {"origins": cors_origins}},
         supports_credentials=True,
-        allow_headers=["Content-Type", "Authorization"],
+        allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         expose_headers=["Content-Type", "Authorization"],
+        max_age=86400,
     )
+
+    @app.before_request
+    def handle_cors_preflight():
+        if request.method != "OPTIONS":
+            return None
+        origin = request.headers.get("Origin")
+        if not origin or not origin_allowed(origin, cors_origins):
+            return None
+        response = app.make_response("")
+        response.status_code = 204
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = cors_allow_methods
+        requested_headers = request.headers.get("Access-Control-Request-Headers")
+        response.headers["Access-Control-Allow-Headers"] = requested_headers or cors_allow_headers
+        response.headers["Access-Control-Max-Age"] = "86400"
+        response.headers.add("Vary", "Origin")
+        return response
 
     @app.after_request
     def ensure_cors_headers(response):
-        """Always attach CORS on API responses (incl. errors / worker edge cases)."""
+        """Always attach CORS on API responses (incl. errors)."""
         origin = request.headers.get("Origin")
         if origin and origin_allowed(origin, cors_origins):
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = cors_allow_methods
+            response.headers["Access-Control-Allow-Headers"] = cors_allow_headers
             response.headers.add("Vary", "Origin")
         return response
 
