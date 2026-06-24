@@ -17,6 +17,14 @@ class LoginSchema(Schema):
     password = fields.Str(required=True)
 
 
+class AdminCreateUserSchema(Schema):
+    email = fields.Email(required=True)
+    password = fields.Str(required=True, validate=validate.Length(min=6))
+    full_name = fields.Str(required=True)
+    phone = fields.Str(load_default="")
+    role = fields.Str(load_default="teacher", validate=validate.OneOf(["teacher"]))
+
+
 class ClassCreateSchema(Schema):
     name = fields.Str(required=True)
     description = fields.Str()

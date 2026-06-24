@@ -1,10 +1,13 @@
 """User management API controller."""
 from flask import Blueprint, request, jsonify
 from app.repositories.user_repo import UserRepository
+from app.services.user_service import UserService
 from app.middleware.auth_middleware import admin_required, role_required
+from app.dto.schemas import validate_request, AdminCreateUserSchema
 
 user_bp = Blueprint("users", __name__, url_prefix="/api/users")
 user_repo = UserRepository()
+user_service = UserService()
 
 
 @user_bp.route("/teacher-profile", methods=["GET"])
@@ -46,13 +49,17 @@ def get_teacher_profile():
 def list_users(current_user):
     role = request.args.get("role")
     page = request.args.get("page", 1, type=int)
-    if role:
-        result = user_repo.find_by_role(role, page=page)
-    else:
-        result = user_repo.find_all(page=page)
-    for u in result["data"]:
-        u.pop("password_hash", None)
-    return jsonify(result), 200
+    limit = min(request.args.get("limit", 20, type=int), 100)
+    result, status = user_service.list_users(role=role or None, page=page, limit=limit)
+    return jsonify(result), status
+
+
+@user_bp.route("", methods=["POST"])
+@admin_required
+@validate_request(AdminCreateUserSchema)
+def create_user(validated_data, current_user):
+    result, status = user_service.create_teacher(validated_data)
+    return jsonify(result), status
 
 
 @user_bp.route("/<user_id>", methods=["GET"])
@@ -63,3 +70,10 @@ def get_user(user_id, current_user):
         return jsonify({"error": "User not found"}), 404
     user.pop("password_hash", None)
     return jsonify(user), 200
+
+
+@user_bp.route("/<user_id>", methods=["DELETE"])
+@admin_required
+def delete_user(user_id, current_user):
+    result, status = user_service.delete_user(user_id, current_user)
+    return jsonify(result), status
