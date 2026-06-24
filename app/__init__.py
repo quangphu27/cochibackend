@@ -31,8 +31,15 @@ def create_app(config_name=None):
 
     logging.basicConfig(level=logging.INFO)
     logging.info("MongoDB database: %s", app.config["MONGODB_DB"])
+    logging.info("CORS origins: %s", app.config["CORS_ORIGINS"])
 
-    CORS(app, origins=[app.config["FRONTEND_URL"], "http://localhost:5173"], supports_credentials=True)
+    CORS(
+        app,
+        origins=app.config["CORS_ORIGINS"],
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    )
 
     jwt.init_app(app)
     init_mongo(app)

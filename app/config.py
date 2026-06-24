@@ -7,6 +7,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _build_cors_origins() -> list[str]:
+    """Allowed browser origins for API + cookies."""
+    origins = {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://bright-future-english.vercel.app",
+    }
+    frontend = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+    if frontend:
+        origins.add(frontend)
+    for part in os.getenv("CORS_ORIGINS", "").split(","):
+        origin = part.strip().rstrip("/")
+        if origin:
+            origins.add(origin)
+    return sorted(origins)
+
+
 def _db_name_from_uri(uri: str) -> str | None:
     """Extract database name from MongoDB URI path, e.g. .../cochibrightfuture"""
     if not uri:
@@ -44,6 +61,9 @@ class Config:
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+    # Comma-separated extra origins, e.g. https://app.vercel.app,https://preview.vercel.app
+    CORS_ORIGINS = _build_cors_origins()
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
