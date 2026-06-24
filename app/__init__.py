@@ -6,7 +6,7 @@ from flask import Flask
 from flask_cors import CORS
 
 from app.config import config
-from app.extensions import init_mongo, jwt, socketio
+from app.extensions import init_mongo, jwt, resolve_socketio_async_mode, socketio
 
 
 def _init_cloudinary(app):
@@ -36,7 +36,9 @@ def create_app(config_name=None):
 
     jwt.init_app(app)
     init_mongo(app)
-    socketio.init_app(app, async_mode="eventlet")
+    async_mode = resolve_socketio_async_mode()
+    logging.info("Socket.IO async_mode=%s", async_mode)
+    socketio.init_app(app, async_mode=async_mode)
     _init_cloudinary(app)
 
     from app.controllers import register_blueprints
