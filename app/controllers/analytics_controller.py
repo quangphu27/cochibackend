@@ -12,6 +12,7 @@ from app.services.analytics_service import (
     normalize_period,
     period_range,
     previous_period_range,
+    count_users_by_role,
     _count_created,
     _pct_change,
 )
@@ -33,15 +34,24 @@ def dashboard_stats():
     period = normalize_period(request.args.get("period"))
     role = user.get("role")
 
-    stats = {
-        "users": db[COLLECTIONS["users"]].count_documents({}),
-        "students": db[COLLECTIONS["users"]].count_documents({"role": "student"}),
-        "teachers": db[COLLECTIONS["users"]].count_documents({"role": "teacher"}),
-        "classes": db[COLLECTIONS["classes"]].count_documents({}),
-        "resources": db[COLLECTIONS["resources"]].count_documents({}),
-        "exams": db[COLLECTIONS["exams"]].count_documents({}),
-        "posts": db[COLLECTIONS["posts"]].count_documents({}),
-    }
+    stats: dict = {}
+
+    if role == "super_admin":
+        stats.update(count_users_by_role(db, COLLECTIONS["users"]))
+        stats["classes"] = db[COLLECTIONS["classes"]].estimated_document_count()
+        stats["resources"] = db[COLLECTIONS["resources"]].estimated_document_count()
+        stats["exams"] = db[COLLECTIONS["exams"]].estimated_document_count()
+        stats["posts"] = db[COLLECTIONS["posts"]].estimated_document_count()
+    else:
+        stats = {
+            "users": 0,
+            "students": 0,
+            "teachers": 0,
+            "classes": 0,
+            "resources": db[COLLECTIONS["resources"]].estimated_document_count(),
+            "exams": 0,
+            "posts": 0,
+        }
 
     class_ids: list[str] = []
 
