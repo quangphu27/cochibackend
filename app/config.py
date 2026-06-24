@@ -1,27 +1,44 @@
 """Application configuration."""
 import os
+import re
 from datetime import timedelta
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Vercel production + preview deployments
+VERCEL_ORIGIN = re.compile(r"^https://[\w-]+\.vercel\.app$")
 
-def _build_cors_origins() -> list[str]:
-    """Allowed browser origins for API + cookies."""
-    origins = {
+
+def _build_cors_origins() -> list:
+    """Allowed browser origins for API (strings + regex patterns)."""
+    origins: list = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://bright-future-english.vercel.app",
-    }
+        VERCEL_ORIGIN,
+    ]
     frontend = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
     if frontend:
-        origins.add(frontend)
+        origins.append(frontend)
     for part in os.getenv("CORS_ORIGINS", "").split(","):
         origin = part.strip().rstrip("/")
         if origin:
-            origins.add(origin)
-    return sorted(origins)
+            origins.append(origin)
+    return origins
+
+
+def origin_allowed(origin: str | None, allowed: list | None = None) -> bool:
+    if not origin:
+        return False
+    for entry in allowed or _build_cors_origins():
+        if isinstance(entry, str):
+            if origin == entry:
+                return True
+        elif hasattr(entry, "match") and entry.match(origin):
+            return True
+    return False
 
 
 def _db_name_from_uri(uri: str) -> str | None:

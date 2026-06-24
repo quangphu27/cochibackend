@@ -13,7 +13,11 @@ def send_email(to_email, subject, html_body):
         msg["To"] = to_email
         msg.attach(MIMEText(html_body, "html"))
 
-        with smtplib.SMTP(current_app.config["SMTP_HOST"], current_app.config["SMTP_PORT"]) as server:
+        with smtplib.SMTP(
+            current_app.config["SMTP_HOST"],
+            current_app.config["SMTP_PORT"],
+            timeout=8,
+        ) as server:
             server.starttls()
             server.login(current_app.config["SMTP_USER"], current_app.config["SMTP_PASSWORD"])
             server.sendmail(current_app.config["SMTP_USER"], to_email, msg.as_string())

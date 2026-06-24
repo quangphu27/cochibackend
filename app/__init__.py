@@ -2,11 +2,11 @@
 import logging
 import os
 import cloudinary
-from flask import Flask
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from app.config import config
-from app.extensions import init_mongo, jwt, resolve_socketio_async_mode, socketio
+from app.config import config, _build_cors_origins, origin_allowed
+from app.extensions import init_mongo, jwt
 
 
 def _init_cloudinary(app):
@@ -31,28 +31,41 @@ def create_app(config_name=None):
 
     logging.basicConfig(level=logging.INFO)
     logging.info("MongoDB database: %s", app.config["MONGODB_DB"])
-    logging.info("CORS origins: %s", app.config["CORS_ORIGINS"])
+
+    cors_origins = _build_cors_origins()
+    app.config["CORS_ORIGINS"] = cors_origins
+    logging.info("CORS origins: %s", cors_origins)
 
     CORS(
         app,
-        origins=app.config["CORS_ORIGINS"],
+        origins=cors_origins,
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        expose_headers=["Content-Type", "Authorization"],
     )
+
+    @app.after_request
+    def ensure_cors_headers(response):
+        """Always attach CORS on API responses (incl. errors / worker edge cases)."""
+        origin = request.headers.get("Origin")
+        if origin and origin_allowed(origin, cors_origins):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers.add("Vary", "Origin")
+        return response
+
+    @app.errorhandler(Exception)
+    def handle_unhandled_exception(err):
+        logging.exception("Unhandled error: %s", err)
+        return jsonify({"error": "Internal server error"}), 500
 
     jwt.init_app(app)
     init_mongo(app)
-    async_mode = resolve_socketio_async_mode()
-    logging.info("Socket.IO async_mode=%s", async_mode)
-    socketio.init_app(app, async_mode=async_mode)
     _init_cloudinary(app)
 
     from app.controllers import register_blueprints
     register_blueprints(app)
-
-    from app.sockets.chat import register_socket_events
-    register_socket_events(socketio)
 
     @app.route("/api/health")
     def health():

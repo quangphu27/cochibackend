@@ -1,9 +1,27 @@
 """Authentication service."""
+import logging
+import threading
+
+from flask import current_app
+
 from app.repositories.user_repo import UserRepository
 from app.utils.auth_utils import hash_password, verify_password, generate_verification_token, verify_token
 from app.utils.email_utils import send_verification_email, send_password_reset_email
 
 user_repo = UserRepository()
+logger = logging.getLogger(__name__)
+
+
+def _send_email_async(app, fn, *args):
+    """Send email in background so HTTP response is not blocked by SMTP."""
+    def _run():
+        with app.app_context():
+            try:
+                fn(*args)
+            except Exception:
+                logger.exception("Background email failed for %s", args[0] if args else "?")
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 class AuthService:
@@ -26,7 +44,8 @@ class AuthService:
         })
 
         token = generate_verification_token(user["email"])
-        send_verification_email(user["email"], token)
+        app = current_app._get_current_object()
+        _send_email_async(app, send_verification_email, user["email"], token)
 
         user.pop("password_hash", None)
         return {"user": user, "message": "Registration successful. Please verify your email."}, 201
@@ -56,7 +75,8 @@ class AuthService:
         if not user:
             return {"message": "If email exists, reset link has been sent"}, 200
         token = generate_verification_token(email)
-        send_password_reset_email(email, token)
+        app = current_app._get_current_object()
+        _send_email_async(app, send_password_reset_email, email, token)
         return {"message": "If email exists, reset link has been sent"}, 200
 
     def reset_password(self, token, new_password):
