@@ -6,7 +6,7 @@ from app.repositories.base import BaseRepository
 from app.models.collections import COLLECTIONS
 from app.utils.cloudinary_utils import (
     upload_image, upload_video, upload_audio, upload_document,
-    cloudinary_attachment_url, safe_download_name,
+    safe_download_name, strip_attachment_transform,
 )
 from app.middleware.auth_middleware import admin_required
 
@@ -73,7 +73,7 @@ def _with_download_url(item):
         file_type=item.get("file_type", ""),
         file_url=item.get("file_url", ""),
     )
-    item["file_url"] = cloudinary_attachment_url(item["file_url"], filename)
+    item["file_url"] = strip_attachment_transform(item["file_url"])
     item["original_filename"] = item.get("original_filename") or filename
     return item
 

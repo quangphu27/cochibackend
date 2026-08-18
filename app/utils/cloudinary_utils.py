@@ -82,15 +82,11 @@ def safe_download_name(
     return f"{stem}.{ext}"
 
 
-def cloudinary_attachment_url(url: str, filename: str) -> str:
-    """Force Cloudinary to serve the file with a proper download name."""
-    if not url or "cloudinary.com" not in url or "/upload/" not in url:
+def strip_attachment_transform(url: str) -> str:
+    """Raw Cloudinary files reject fl_attachment (HTTP 400). Always use the original URL."""
+    if not url:
         return url
-    if "fl_attachment" in url:
-        return url
-    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", filename or "file")
-    prefix, rest = url.split("/upload/", 1)
-    return f"{prefix}/upload/fl_attachment:{safe}/{rest}"
+    return re.sub(r"/upload/fl_attachment:[^/]+/", "/upload/", url)
 
 
 def upload_file(file, resource_type="auto", folder=None, public_id=None, **extra):
