@@ -12,7 +12,7 @@ class ResourceRepository(BaseRepository):
             query["grade"] = grade
         if skill:
             query["skill"] = skill
-        return self.find_all(query, page=page, limit=limit)
+        return self.find_all(query, page=page, limit=limit, sort=[("created_at", -1)])
 
 
 class PostRepository(BaseRepository):
@@ -26,7 +26,7 @@ class DocumentRepository(BaseRepository):
     collection_name = COLLECTIONS["documents"]
 
     def find_by_category(self, category, page=1, limit=20):
-        return self.find_all({"category": category}, page=page, limit=limit)
+        return self.find_all({"category": category}, page=page, limit=limit, sort=[("created_at", -1)])
 
 
 class NotificationRepository(BaseRepository):

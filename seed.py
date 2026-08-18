@@ -95,20 +95,6 @@ def seed():
         for u in CORE_USERS:
             upsert_user(db, u)
 
-        if db[COLLECTIONS["resources"]].count_documents({}) == 0:
-            resources = [
-                {"title": "Past Simple Tense", "description": "Grammar guide for Grade 10", "grade": "Grade 10", "skill": "Grammar", "category": "worksheet", "file_type": "pdf", "file_url": "", "cloudinary_id": "", "thumbnail_url": "", "uploaded_by": "", "downloads": 0},
-                {"title": "Reading Comprehension Unit 1", "description": "Practice reading for Grade 11", "grade": "Grade 11", "skill": "Reading", "category": "worksheet", "file_type": "pdf", "file_url": "", "cloudinary_id": "", "thumbnail_url": "", "uploaded_by": "", "downloads": 0},
-                {"title": "THPT Vocabulary List", "description": "Essential vocabulary for graduation exam", "grade": "THPT Graduation Exam", "skill": "Vocabulary", "category": "list", "file_type": "pdf", "file_url": "", "cloudinary_id": "", "thumbnail_url": "", "uploaded_by": "", "downloads": 0},
-                {"title": "Listening Practice Audio", "description": "Grade 12 listening exercises", "grade": "Grade 12", "skill": "Listening", "category": "audio", "file_type": "audio", "file_url": "", "cloudinary_id": "", "thumbnail_url": "", "uploaded_by": "", "downloads": 0},
-                {"title": "Speaking Topics Grade 10", "description": "Common speaking topics and sample answers", "grade": "Grade 10", "skill": "Speaking", "category": "guide", "file_type": "pdf", "file_url": "", "cloudinary_id": "", "thumbnail_url": "", "uploaded_by": "", "downloads": 0},
-            ]
-            for r in resources:
-                r["created_at"] = datetime.utcnow()
-                r["updated_at"] = datetime.utcnow()
-            db[COLLECTIONS["resources"]].insert_many(resources)
-            print(f"Seeded {len(resources)} resources")
-
         if db[COLLECTIONS["questions"]].count_documents({}) == 0:
             questions = [
                 {"type": "mcq", "content": "She ___ to school every day.", "options": ["go", "goes", "going", "gone"], "correct_answer": "goes", "explanation": "Third person singular", "category": "Grammar", "skill": "Grammar", "grade": "Grade 10", "difficulty": "easy", "tags": ["present-simple"], "points": 1, "created_by": "", "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()},
@@ -117,14 +103,6 @@ def seed():
             ]
             db[COLLECTIONS["questions"]].insert_many(questions)
             print(f"Seeded {len(questions)} questions")
-
-        if db[COLLECTIONS["documents"]].count_documents({}) == 0:
-            docs = [
-                {"title": "English Curriculum Grade 10", "description": "Official curriculum guidelines", "category": "Ministry Documents", "file_url": "", "file_type": "pdf", "uploaded_by": "", "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()},
-                {"title": "Teaching Guidelines 2026", "description": "Department teaching standards", "category": "Department Documents", "file_url": "", "file_type": "pdf", "uploaded_by": "", "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()},
-            ]
-            db[COLLECTIONS["documents"]].insert_many(docs)
-            print(f"Seeded {len(docs)} documents")
 
         if db[COLLECTIONS["posts"]].count_documents({}) == 0:
             teacher = db[COLLECTIONS["users"]].find_one({"email": "giaovien@gmail.com"})
@@ -135,22 +113,6 @@ def seed():
             ]
             db[COLLECTIONS["posts"]].insert_many(posts)
             print(f"Seeded {len(posts)} posts")
-
-        if db[COLLECTIONS["entertainment"]].count_documents({}) == 0:
-            items = [
-                {"title": "Shape of You - Ed Sheeran", "category": "English Songs", "description": "Popular English song for listening practice", "media_url": "", "thumbnail_url": "", "duration": 240, "uploaded_by": "", "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()},
-                {"title": "The Little Prince", "category": "Short Stories", "description": "Classic short story in English", "media_url": "", "thumbnail_url": "", "duration": 0, "uploaded_by": "", "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()},
-            ]
-            db[COLLECTIONS["entertainment"]].insert_many(items)
-            print(f"Seeded {len(items)} entertainment items")
-
-        if db[COLLECTIONS["albums"]].count_documents({}) == 0:
-            albums = [
-                {"title": "School English Festival 2025", "description": "Photos from the annual festival", "category": "School Activities", "cover_url": "", "media_ids": [], "created_by": "", "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()},
-                {"title": "English Speaking Competition", "description": "Student speaking competition photos", "category": "Competitions", "cover_url": "", "media_ids": [], "created_by": "", "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()},
-            ]
-            db[COLLECTIONS["albums"]].insert_many(albums)
-            print(f"Seeded {len(albums)} albums")
 
         print("Seed completed successfully!")
 
