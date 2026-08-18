@@ -1,6 +1,15 @@
 """Cloudinary upload utilities."""
 import os
+import re
+import uuid
+from pathlib import Path
+
 import cloudinary.uploader
+
+ALLOWED_EXTS = {
+    "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx",
+    "png", "jpg", "jpeg", "gif", "webp", "mp4", "webm", "mp3", "wav", "ogg",
+}
 
 
 def _folder_prefix():
@@ -23,8 +32,69 @@ def get_folder_map():
     }
 
 
-def upload_file(file, resource_type="auto", folder=None, public_id=None):
-    options = {"resource_type": resource_type}
+def _ext_from_url(url: str) -> str:
+    if not url:
+        return ""
+    name = Path(url.split("?")[0].rstrip("/")).name
+    ext = Path(name).suffix.lstrip(".").lower()
+    return ext if ext in ALLOWED_EXTS else ""
+
+
+def _raw_public_id(filename: str) -> str:
+    """Keep original name + extension so downloads open correctly."""
+    name = Path(filename or "document").name
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", Path(name).stem)[:80].strip("_") or "file"
+    ext = Path(name).suffix.lstrip(".").lower()
+    unique = uuid.uuid4().hex[:8]
+    if ext:
+        return f"{stem}_{unique}.{ext}"
+    return f"{stem}_{unique}"
+
+
+def safe_download_name(
+    title: str = "",
+    original_filename: str = "",
+    file_type: str = "",
+    file_url: str = "",
+) -> str:
+    original = Path(original_filename or "").name
+    ext = Path(original).suffix.lstrip(".").lower()
+    if ext not in ALLOWED_EXTS:
+        ext = ""
+    if not ext:
+        ext = _ext_from_url(file_url)
+    if not ext:
+        ext = {
+            "pdf": "pdf",
+            "document": "pdf",
+            "doc": "doc",
+            "docx": "docx",
+            "ppt": "ppt",
+            "pptx": "pptx",
+            "xls": "xls",
+            "xlsx": "xlsx",
+            "image": "jpg",
+            "video": "mp4",
+            "audio": "mp3",
+        }.get((file_type or "").lower(), "pdf")
+    stem_source = Path(original).stem if original else (title or "file")
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", stem_source)[:80].strip("_") or "file"
+    return f"{stem}.{ext}"
+
+
+def cloudinary_attachment_url(url: str, filename: str) -> str:
+    """Force Cloudinary to serve the file with a proper download name."""
+    if not url or "cloudinary.com" not in url or "/upload/" not in url:
+        return url
+    if "fl_attachment" in url:
+        return url
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", filename or "file")
+    prefix, rest = url.split("/upload/", 1)
+    return f"{prefix}/upload/fl_attachment:{safe}/{rest}"
+
+
+def upload_file(file, resource_type="auto", folder=None, public_id=None, **extra):
+    options = {"resource_type": resource_type, **extra}
     if folder:
         options["folder"] = folder
     if public_id:
@@ -49,7 +119,13 @@ def upload_audio(file, folder=None):
 
 def upload_document(file, folder=None):
     folders = get_folder_map()
-    return upload_file(file, resource_type="raw", folder=folder or folders["document"])
+    filename = getattr(file, "filename", None) or "document"
+    return upload_file(
+        file,
+        resource_type="raw",
+        folder=folder or folders["document"],
+        public_id=_raw_public_id(filename),
+    )
 
 
 def delete_file(public_id, resource_type="image"):

@@ -4,7 +4,10 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.repositories.content_repo import ResourceRepository, PostRepository, DocumentRepository, NotificationRepository
 from app.repositories.base import BaseRepository
 from app.models.collections import COLLECTIONS
-from app.utils.cloudinary_utils import upload_image, upload_video, upload_audio, upload_document
+from app.utils.cloudinary_utils import (
+    upload_image, upload_video, upload_audio, upload_document,
+    cloudinary_attachment_url, safe_download_name,
+)
 from app.middleware.auth_middleware import admin_required
 
 content_bp = Blueprint("content", __name__, url_prefix="/api")
@@ -54,9 +57,32 @@ def _file_type_from_name(filename: str) -> str:
         return "video"
     if ext in ("mp3", "wav", "ogg"):
         return "audio"
+    if ext in ("doc", "docx", "ppt", "pptx", "xls", "xlsx"):
+        return ext
     if ext == "pdf":
         return "pdf"
     return "document"
+
+
+def _with_download_url(item):
+    if not item or not item.get("file_url"):
+        return item
+    filename = safe_download_name(
+        title=item.get("title", ""),
+        original_filename=item.get("original_filename", ""),
+        file_type=item.get("file_type", ""),
+        file_url=item.get("file_url", ""),
+    )
+    item["file_url"] = cloudinary_attachment_url(item["file_url"], filename)
+    item["original_filename"] = item.get("original_filename") or filename
+    return item
+
+
+def _map_download_urls(result):
+    if isinstance(result, dict) and "data" in result:
+        result["data"] = [_with_download_url(item) for item in result["data"]]
+        return result
+    return _with_download_url(result)
 
 
 @content_bp.route("/resources", methods=["GET"])
@@ -65,7 +91,7 @@ def list_resources():
     skill = request.args.get("skill")
     page = request.args.get("page", 1, type=int)
     result = resource_repo.find_by_grade_skill(grade, skill, page=page)
-    return jsonify(result), 200
+    return jsonify(_map_download_urls(result)), 200
 
 
 @content_bp.route("/resources", methods=["POST"])
@@ -74,6 +100,10 @@ def create_resource(current_user):
     data = request.form.to_dict()
     file = request.files.get("file")
     upload_result = _upload_file(file)
+    original_name = file.filename if file else ""
+    file_url = upload_result["secure_url"] if upload_result else data.get("file_url", "")
+    file_type = data.get("file_type") or _file_type_from_name(original_name)
+    download_name = safe_download_name(data.get("title", ""), original_name, file_type)
 
     resource = resource_repo.create({
         "title": data.get("title", ""),
@@ -81,14 +111,15 @@ def create_resource(current_user):
         "grade": data.get("grade", ""),
         "skill": data.get("skill", ""),
         "category": data.get("category", ""),
-        "file_type": data.get("file_type") or _file_type_from_name(file.filename if file else ""),
-        "file_url": upload_result["secure_url"] if upload_result else data.get("file_url", ""),
+        "file_type": file_type,
+        "file_url": file_url,
+        "original_filename": original_name or download_name,
         "cloudinary_id": upload_result["public_id"] if upload_result else "",
         "thumbnail_url": upload_result.get("thumbnail_url", "") if upload_result else "",
         "uploaded_by": current_user["id"],
         "downloads": 0,
     })
-    return jsonify(resource), 201
+    return jsonify(_with_download_url(resource)), 201
 
 
 @content_bp.route("/resources/<resource_id>", methods=["DELETE"])
@@ -136,7 +167,7 @@ def list_documents():
         result = document_repo.find_by_category(category, page=page)
     else:
         result = document_repo.find_all(page=page, sort=[("created_at", -1)])
-    return jsonify(result), 200
+    return jsonify(_map_download_urls(result)), 200
 
 
 @content_bp.route("/documents", methods=["POST"])
@@ -145,15 +176,19 @@ def create_document(current_user):
     data = request.form.to_dict()
     file = request.files.get("file")
     upload_result = _upload_file(file)
+    original_name = file.filename if file else ""
+    file_type = _file_type_from_name(original_name)
+    download_name = safe_download_name(data.get("title", ""), original_name, file_type)
     doc = document_repo.create({
         "title": data.get("title", ""),
         "description": data.get("description", ""),
         "category": data.get("category", ""),
         "file_url": upload_result["secure_url"] if upload_result else data.get("file_url", ""),
-        "file_type": _file_type_from_name(file.filename if file else ""),
+        "file_type": file_type,
+        "original_filename": original_name or download_name,
         "uploaded_by": current_user["id"],
     })
-    return jsonify(doc), 201
+    return jsonify(_with_download_url(doc)), 201
 
 
 @content_bp.route("/documents/<doc_id>", methods=["DELETE"])
