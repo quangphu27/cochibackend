@@ -3,6 +3,7 @@ import logging
 import os
 import cloudinary
 from flask import Flask, jsonify, request
+from werkzeug.exceptions import HTTPException
 from flask_cors import CORS
 
 from app.config import config, _build_cors_origins, origin_allowed
@@ -79,6 +80,15 @@ def create_app(config_name=None):
             response.headers.add("Vary", "Origin")
         return response
 
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(err: HTTPException):
+        if err.code == 404:
+            return jsonify({
+                "error": "Not found",
+                "message": "API không có đường dẫn này. Dùng GET /api/health hoặc /api/...",
+            }), 404
+        return jsonify({"error": err.description or err.name, "code": err.code}), err.code
+
     @app.errorhandler(Exception)
     def handle_unhandled_exception(err):
         logging.exception("Unhandled error: %s", err)
@@ -91,14 +101,27 @@ def create_app(config_name=None):
     from app.controllers import register_blueprints
     register_blueprints(app)
 
+    @app.route("/")
+    def index():
+        return jsonify({
+            "service": "Bright Future English API",
+            "status": "running",
+            "health": "/api/health",
+            "frontend": app.config.get("FRONTEND_URL"),
+        }), 200
+
     @app.route("/api/health")
     def health():
-        return {
+        return jsonify({
             "status": "ok",
             "service": "Bright Future English API",
             "db": app.config["MONGODB_DB"],
             "cloudinary_folder": app.config["CLOUDINARY_FOLDER_PREFIX"],
-        }, 200
+        }), 200
+
+    @app.route("/favicon.ico")
+    def favicon():
+        return "", 204
 
     return app
 
