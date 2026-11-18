@@ -29,20 +29,22 @@ class AIService:
         self.openai_key = current_app.config.get("OPENAI_API_KEY", "")
         self.gemini_key = current_app.config.get("GEMINI_API_KEY", "")
 
-    def generate(self, tool_type, params, provider="openai"):
+    def generate(self, tool_type, params, provider="gemini"):
         self._get_keys()
         params = params or {}
-        prompt_template = AI_TOOLS.get(tool_type, params.get("prompt", ""))
-        try:
-            prompt = prompt_template.format_map(DefaultDict(params)) if "{" in prompt_template else prompt_template
-        except (KeyError, ValueError):
-            prompt = f"{prompt_template}\n\nParams: {params}"
+        if params.get("prompt"):
+            prompt = params["prompt"]
+        else:
+            prompt_template = AI_TOOLS.get(tool_type, "")
+            try:
+                prompt = prompt_template.format_map(DefaultDict(params)) if "{" in prompt_template else prompt_template
+            except (KeyError, ValueError):
+                prompt = f"{prompt_template}\n\nParams: {params}"
 
-        if provider == "gemini" and self.gemini_key:
+        # Nền tảng dùng Google Gemini làm mô hình AI mặc định duy nhất.
+        if self.gemini_key:
             return self._call_gemini(prompt)
-        if self.openai_key:
-            return self._call_openai(prompt)
-        return {"error": "No AI provider configured", "response": "Please configure OPENAI_API_KEY or GEMINI_API_KEY in .env"}
+        return {"error": "Chưa cấu hình GEMINI_API_KEY", "response": None, "provider": "gemini"}
 
     def _call_openai(self, prompt):
         try:
@@ -65,10 +67,17 @@ class AIService:
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.gemini_key)
-            model = genai.GenerativeModel("gemini-pro")
+            model = genai.GenerativeModel(
+                "gemini-1.5-flash",
+                generation_config={"max_output_tokens": 8192, "temperature": 0.4},
+            )
             response = model.generate_content(
                 f"You are an expert English teacher assistant for Vietnamese high school students.\n\n{prompt}"
             )
-            return {"provider": "gemini", "response": response.text, "tokens_used": 0}
+            text = getattr(response, "text", None) or ""
+            if not text and response.candidates:
+                parts = response.candidates[0].content.parts
+                text = "".join(getattr(p, "text", "") or "" for p in parts)
+            return {"provider": "gemini", "response": text, "tokens_used": 0}
         except Exception as e:
             return {"provider": "gemini", "error": str(e), "response": None}

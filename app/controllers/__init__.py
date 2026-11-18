@@ -10,6 +10,8 @@ from app.controllers.lms_controller import lms_bp
 from app.controllers.community_controller import community_bp
 from app.controllers.speaking_controller import speaking_bp, writing_bp
 from app.controllers.lesson_controller import lesson_bp
+from app.controllers.thpt_mock_controller import thpt_mock_bp
+from app.controllers.text_vocab_controller import text_vocab_bp
 
 
 def register_blueprints(app):
@@ -25,3 +27,5 @@ def register_blueprints(app):
     app.register_blueprint(speaking_bp)
     app.register_blueprint(writing_bp)
     app.register_blueprint(lesson_bp)
+    app.register_blueprint(thpt_mock_bp)
+    app.register_blueprint(text_vocab_bp)

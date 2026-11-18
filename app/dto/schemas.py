@@ -95,7 +95,29 @@ class ExamCreateSchema(Schema):
 class AIGenerateSchema(Schema):
     tool_type = fields.Str(required=True)
     params = fields.Dict()
-    provider = fields.Str(validate=validate.OneOf(["openai", "gemini"]))
+    provider = fields.Str(load_default="gemini", validate=validate.OneOf(["openai", "gemini"]))
+
+
+class TextVocabAnalyzeSchema(Schema):
+    content = fields.Str(required=True)
+    level = fields.Str(load_default="B1")
+    provider = fields.Str(load_default="gemini", validate=validate.OneOf(["openai", "gemini"]))
+
+
+class TextVocabPracticeSchema(Schema):
+    content = fields.Str(required=True)
+    level = fields.Str(load_default="B1")
+    mode = fields.Str(load_default="fill_gaps")
+    words = fields.List(fields.Str())
+    provider = fields.Str(load_default="gemini", validate=validate.OneOf(["openai", "gemini"]))
+
+
+class TextVocabFeedbackSchema(Schema):
+    content = fields.Str()
+    level = fields.Str(load_default="B1")
+    question = fields.Str(required=True)
+    answer = fields.Str(required=True)
+    provider = fields.Str(load_default="gemini", validate=validate.OneOf(["openai", "gemini"]))
 
 
 def validate_request(schema_class):

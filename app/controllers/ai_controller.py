@@ -25,7 +25,7 @@ def generate(validated_data):
     result = ai_service.generate(
         validated_data["tool_type"],
         validated_data.get("params", {}),
-        validated_data.get("provider", "openai"),
+        validated_data.get("provider", "gemini"),
     )
 
     history_repo.create({
