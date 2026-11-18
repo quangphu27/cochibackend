@@ -32,7 +32,7 @@ def create_app(config_name=None):
     logging.basicConfig(level=logging.INFO)
     logging.info("MongoDB database: %s", app.config["MONGODB_DB"])
 
-    cors_origins = _build_cors_origins()
+    cors_origins = _build_cors_origins(app.config.get("FRONTEND_URL"))
     app.config["CORS_ORIGINS"] = cors_origins
     logging.info("CORS origins: %s", cors_origins)
 

@@ -10,21 +10,35 @@ load_dotenv()
 # Vercel production + preview deployments
 VERCEL_ORIGIN = re.compile(r"^https://[\w-]+\.vercel\.app$")
 
+PRODUCTION_FRONTEND_URL = "https://bright-future-english.vercel.app"
 
-def _build_cors_origins() -> list:
+
+def _default_frontend_url() -> str:
+    explicit = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    if os.getenv("FLASK_ENV", "development").lower() == "production":
+        return PRODUCTION_FRONTEND_URL
+    return "http://localhost:5173"
+
+
+def _build_cors_origins(app_frontend_url: str | None = None) -> list:
     """Allowed browser origins for API (strings + regex patterns)."""
     origins: list = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://bright-future-english.vercel.app",
+        PRODUCTION_FRONTEND_URL,
         VERCEL_ORIGIN,
     ]
-    frontend = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
-    if frontend:
-        origins.append(frontend)
+    for url in (
+        os.getenv("FRONTEND_URL", "").strip().rstrip("/"),
+        (app_frontend_url or "").strip().rstrip("/"),
+    ):
+        if url and url not in origins:
+            origins.append(url)
     for part in os.getenv("CORS_ORIGINS", "").split(","):
         origin = part.strip().rstrip("/")
-        if origin:
+        if origin and origin not in origins:
             origins.append(origin)
     return origins
 
@@ -77,10 +91,10 @@ class Config:
     SMTP_USER = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    FRONTEND_URL = _default_frontend_url()
 
-    # Comma-separated extra origins, e.g. https://app.vercel.app,https://preview.vercel.app
-    CORS_ORIGINS = _build_cors_origins()
+    # Filled at app startup in create_app(); placeholder for config object
+    CORS_ORIGINS: list = []
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
@@ -93,6 +107,7 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    FRONTEND_URL = os.getenv("FRONTEND_URL", PRODUCTION_FRONTEND_URL).strip().rstrip("/")
 
 
 config = {
