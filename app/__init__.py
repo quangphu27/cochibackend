@@ -101,3 +101,7 @@ def create_app(config_name=None):
         }, 200
 
     return app
+
+
+# Gunicorn on Render often uses: gunicorn app:app
+app = create_app()
