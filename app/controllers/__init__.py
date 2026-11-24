@@ -12,6 +12,8 @@ from app.controllers.speaking_controller import speaking_bp, writing_bp
 from app.controllers.lesson_controller import lesson_bp
 from app.controllers.thpt_mock_controller import thpt_mock_bp
 from app.controllers.text_vocab_controller import text_vocab_bp
+from app.controllers.tts_controller import tts_bp
+from app.controllers.game_set_controller import game_sets_bp
 
 
 def register_blueprints(app):
@@ -29,3 +31,5 @@ def register_blueprints(app):
     app.register_blueprint(lesson_bp)
     app.register_blueprint(thpt_mock_bp)
     app.register_blueprint(text_vocab_bp)
+    app.register_blueprint(tts_bp)
+    app.register_blueprint(game_sets_bp)

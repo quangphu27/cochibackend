@@ -120,6 +120,24 @@ class TextVocabFeedbackSchema(Schema):
     provider = fields.Str(load_default="gemini", validate=validate.OneOf(["openai", "gemini"]))
 
 
+class TtsGenerateSchema(Schema):
+    text = fields.Str(required=True)
+    voice = fields.Str(load_default="en-US")
+    slow = fields.Bool(load_default=False)
+
+
+class GameSetUpsertSchema(Schema):
+    type = fields.Str(required=True, validate=validate.OneOf(["wheel", "flashcards", "crossword"]))
+    title = fields.Str(load_default="Bộ trò chơi mới")
+    content_text = fields.Str(load_default="")
+    contentText = fields.Str(load_default="")
+    wheel_items = fields.List(fields.Dict(), load_default=None)
+    wheelItems = fields.List(fields.Dict(), load_default=None)
+    flashcards = fields.List(fields.Dict(), load_default=None)
+    crossword_data = fields.Dict(load_default=None)
+    crosswordData = fields.Dict(load_default=None)
+
+
 def validate_request(schema_class):
     def decorator(fn):
         @wraps(fn)

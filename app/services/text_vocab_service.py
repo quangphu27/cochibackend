@@ -152,7 +152,11 @@ class TextVocabService:
             return {"error": f"Văn bản tối đa {MAX_CHARS} ký tự"}, 400
         cefr = _normalize_level(level)
         prompt = ANALYZE_PROMPT.format(level=cefr, content=text, char_count=len(text))
-        ai_result = ai_service.generate("reading_questions", {"prompt": prompt, "content": text}, provider)
+        ai_result = ai_service.generate(
+            "reading_questions",
+            {"prompt": prompt, "content": text, "json_mode": True},
+            provider,
+        )
         if ai_result.get("error") and not ai_result.get("response"):
             return {"error": ai_result["error"]}, 502
         try:
@@ -174,7 +178,11 @@ class TextVocabService:
         word_list = ", ".join(words[:30]) if words else "(từ khó trong bài)"
         tpl = PRACTICE_PROMPTS[mode]
         prompt = tpl.format(level=cefr, content=text[:MAX_CHARS], words=word_list)
-        ai_result = ai_service.generate("vocabulary_builder", {"prompt": prompt, "topic": word_list, "level": cefr}, provider)
+        ai_result = ai_service.generate(
+            "vocabulary_builder",
+            {"prompt": prompt, "topic": word_list, "level": cefr, "json_mode": True},
+            provider,
+        )
         if ai_result.get("error") and not ai_result.get("response"):
             return {"error": ai_result["error"]}, 502
         try:
@@ -194,7 +202,11 @@ class TextVocabService:
             answer=answer.strip(),
             content_slice=(content or "")[:2000],
         )
-        ai_result = ai_service.generate("writing_evaluation", {"prompt": prompt, "content": answer}, provider)
+        ai_result = ai_service.generate(
+            "writing_evaluation",
+            {"prompt": prompt, "content": answer, "json_mode": True},
+            provider,
+        )
         if ai_result.get("error") and not ai_result.get("response"):
             return {"error": ai_result["error"]}, 502
         try:

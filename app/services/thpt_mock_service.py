@@ -121,7 +121,11 @@ class ThptMockService:
             source_text=source_text[:18000],
         )
 
-        ai_result = ai_service.generate("thpt_mock_exam", {"prompt": prompt, "content": source_text}, provider)
+        ai_result = ai_service.generate(
+            "thpt_mock_exam",
+            {"prompt": prompt, "content": source_text, "json_mode": True},
+            provider,
+        )
         if ai_result.get("error") and not ai_result.get("response"):
             return {"error": ai_result.get("error", "AI lỗi")}, 502
 

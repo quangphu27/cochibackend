@@ -1,4 +1,4 @@
-"""AI service integrations - OpenAI and Gemini."""
+"""AI service — Google Gemini only (default models: 2.5 Flash / flash-latest)."""
 from flask import current_app
 
 AI_TOOLS = {
@@ -14,6 +14,13 @@ AI_TOOLS = {
     "reading_questions": "Generate reading comprehension questions for this passage: {content}",
 }
 
+# gemini-1.5-flash đã bị gỡ khỏi API → dùng 2.5 / alias latest
+DEFAULT_GEMINI_MODELS = (
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.0-flash",
+)
+
 
 class DefaultDict(dict):
     def __missing__(self, key):
@@ -27,7 +34,17 @@ class AIService:
 
     def _get_keys(self):
         self.openai_key = current_app.config.get("OPENAI_API_KEY", "")
-        self.gemini_key = current_app.config.get("GEMINI_API_KEY", "")
+        self.gemini_key = (current_app.config.get("GEMINI_API_KEY") or "").strip()
+
+    def _model_candidates(self):
+        preferred = (current_app.config.get("GEMINI_MODEL") or "").strip()
+        models = []
+        if preferred:
+            models.append(preferred)
+        for m in DEFAULT_GEMINI_MODELS:
+            if m not in models:
+                models.append(m)
+        return models
 
     def generate(self, tool_type, params, provider="gemini"):
         self._get_keys()
@@ -41,43 +58,87 @@ class AIService:
             except (KeyError, ValueError):
                 prompt = f"{prompt_template}\n\nParams: {params}"
 
-        # Nền tảng dùng Google Gemini làm mô hình AI mặc định duy nhất.
-        if self.gemini_key:
-            return self._call_gemini(prompt)
-        return {"error": "Chưa cấu hình GEMINI_API_KEY", "response": None, "provider": "gemini"}
+        json_mode = bool(params.get("json_mode"))
+        if not self.gemini_key:
+            return {
+                "error": "Chưa cấu hình GEMINI_API_KEY trên server",
+                "response": None,
+                "provider": "gemini",
+            }
+        return self._call_gemini(prompt, json_mode=json_mode)
 
-    def _call_openai(self, prompt):
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=self.openai_key)
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are an expert English teacher assistant for Vietnamese high school students."},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=2000,
-            )
-            content = response.choices[0].message.content
-            return {"provider": "openai", "response": content, "tokens_used": response.usage.total_tokens}
-        except Exception as e:
-            return {"provider": "openai", "error": str(e), "response": None}
-
-    def _call_gemini(self, prompt):
+    def _call_gemini(self, prompt, json_mode=False):
         try:
             import google.generativeai as genai
-            genai.configure(api_key=self.gemini_key)
-            model = genai.GenerativeModel(
-                "gemini-1.5-flash",
-                generation_config={"max_output_tokens": 8192, "temperature": 0.4},
-            )
-            response = model.generate_content(
-                f"You are an expert English teacher assistant for Vietnamese high school students.\n\n{prompt}"
-            )
+        except ImportError:
+            return {
+                "provider": "gemini",
+                "error": "Thiếu thư viện google-generativeai",
+                "response": None,
+            }
+
+        genai.configure(api_key=self.gemini_key)
+        system = (
+            "You are an expert English teacher assistant for Vietnamese high school students. "
+            "Follow the user instructions carefully."
+        )
+        if json_mode:
+            system += " Reply with valid JSON only — no markdown fences."
+
+        generation_config = {
+            "max_output_tokens": 8192,
+            "temperature": 0.35,
+        }
+        if json_mode:
+            generation_config["response_mime_type"] = "application/json"
+
+        last_error = None
+        for model_name in self._model_candidates():
+            try:
+                model = genai.GenerativeModel(
+                    model_name,
+                    generation_config=generation_config,
+                )
+                response = model.generate_content(f"{system}\n\n{prompt}")
+                text = self._response_text(response)
+                if not text:
+                    last_error = f"Model {model_name} trả về rỗng (có thể bị chặn an toàn)"
+                    continue
+                return {
+                    "provider": "gemini",
+                    "model": model_name,
+                    "response": text,
+                    "tokens_used": 0,
+                }
+            except Exception as e:
+                msg = str(e)
+                last_error = f"{model_name}: {msg}"
+                # thử model kế nếu 404 / not found
+                if "404" in msg or "not found" in msg.lower():
+                    continue
+                # lỗi auth / quota — không cần thử model khác
+                if any(x in msg.lower() for x in ("api key", "permission", "403", "401", "quota", "resource_exhausted")):
+                    break
+
+        return {
+            "provider": "gemini",
+            "error": last_error or "Gemini không phản hồi",
+            "response": None,
+        }
+
+    @staticmethod
+    def _response_text(response) -> str:
+        try:
             text = getattr(response, "text", None) or ""
-            if not text and response.candidates:
-                parts = response.candidates[0].content.parts
-                text = "".join(getattr(p, "text", "") or "" for p in parts)
-            return {"provider": "gemini", "response": text, "tokens_used": 0}
-        except Exception as e:
-            return {"provider": "gemini", "error": str(e), "response": None}
+            if text:
+                return text.strip()
+        except Exception:
+            pass
+        try:
+            candidates = getattr(response, "candidates", None) or []
+            if not candidates:
+                return ""
+            parts = candidates[0].content.parts
+            return "".join(getattr(p, "text", "") or "" for p in parts).strip()
+        except Exception:
+            return ""

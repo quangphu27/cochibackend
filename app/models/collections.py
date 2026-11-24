@@ -32,6 +32,8 @@ COLLECTIONS = {
     "lesson_progress": "lesson_progress",
     "thpt_mock_papers": "thpt_mock_papers",
     "thpt_mock_attempts": "thpt_mock_attempts",
+    "tts_history": "tts_history",
+    "game_sets": "game_sets",
 }
 
 
@@ -63,3 +65,6 @@ def create_indexes(db):
     db[COLLECTIONS["thpt_mock_papers"]].create_index("created_by")
     db[COLLECTIONS["thpt_mock_attempts"]].create_index([("paper_id", 1), ("student_id", 1)], unique=True)
     db[COLLECTIONS["thpt_mock_attempts"]].create_index("share_code")
+    db[COLLECTIONS["tts_history"]].create_index([("user_id", 1), ("created_at", -1)])
+    db[COLLECTIONS["game_sets"]].create_index([("user_id", 1), ("updated_at", -1)])
+    db[COLLECTIONS["game_sets"]].create_index([("user_id", 1), ("type", 1), ("updated_at", -1)])

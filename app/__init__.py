@@ -1,6 +1,8 @@
 """Flask application factory."""
 import logging
 import os
+from urllib.parse import urlparse, unquote
+
 import cloudinary
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
@@ -11,11 +13,27 @@ from app.extensions import init_mongo, jwt
 
 
 def _init_cloudinary(app):
-    """Initialize Cloudinary from CLOUDINARY_URL or individual keys."""
-    cloudinary_url = app.config.get("CLOUDINARY_URL") or os.getenv("CLOUDINARY_URL")
+    """Initialize Cloudinary from CLOUDINARY_URL or individual keys.
+
+    Passing cloudinary_url= as a kwarg only stores the string — it does NOT
+    parse api_key/api_secret. Parse the URL (or use discrete keys) instead.
+    """
+    cloudinary_url = (app.config.get("CLOUDINARY_URL") or os.getenv("CLOUDINARY_URL") or "").strip()
     if cloudinary_url:
-        os.environ.setdefault("CLOUDINARY_URL", cloudinary_url)
-        cloudinary.config(secure=True)
+        os.environ["CLOUDINARY_URL"] = cloudinary_url
+        parsed = urlparse(cloudinary_url)
+        cloud_name = parsed.hostname
+        api_key = unquote(parsed.username) if parsed.username else None
+        api_secret = unquote(parsed.password) if parsed.password else None
+        if cloud_name and api_key and api_secret:
+            cloudinary.config(
+                cloud_name=cloud_name,
+                api_key=api_key,
+                api_secret=api_secret,
+                secure=True,
+            )
+        else:
+            logging.warning("CLOUDINARY_URL is set but could not be parsed into credentials")
     elif app.config.get("CLOUDINARY_CLOUD_NAME"):
         cloudinary.config(
             cloud_name=app.config["CLOUDINARY_CLOUD_NAME"],
