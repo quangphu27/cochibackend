@@ -1,12 +1,25 @@
-"""Persist interactive game sets (wheel / flashcards / crossword) per user."""
+"""Persist interactive game / studio tool sets per user."""
 from app.models.collections import COLLECTIONS
 from app.repositories.base import BaseRepository
 
-VALID_TYPES = ("wheel", "flashcards", "crossword")
+EDITOR_TYPES = ("wheel", "flashcards", "crossword")
+TOOL_TYPES = (
+    "name-picker",
+    "match-pairs",
+    "word-search",
+    "paced-quiz",
+    "tug-of-war",
+    "html-game",
+    "countdown",
+    "sleeping-dragon",
+    "text-profiler",
+)
+VALID_TYPES = EDITOR_TYPES + TOOL_TYPES
 MAX_TITLE = 120
 MAX_WHEEL = 80
 MAX_FLASHCARDS = 200
 MAX_CROSSWORD_ROWS = 20
+MAX_CONTENT = 100_000
 
 
 class GameSetRepo(BaseRepository):
@@ -66,13 +79,75 @@ def _clean_crossword(data):
     }
 
 
+def _nonempty_lines(text: str):
+    return [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+
+
+def _validate_tool_content(game_type: str, content_text: str):
+    text = (content_text or "").strip()
+    if not text:
+        return "Nội dung trống — nhập rồi mới lưu"
+
+    if game_type == "name-picker":
+        if len(_nonempty_lines(text)) < 1:
+            return "Cần ít nhất 1 tên trong danh sách"
+        return None
+
+    if game_type == "match-pairs":
+        pairs = 0
+        for ln in _nonempty_lines(text):
+            if "|" in ln or "\t" in ln:
+                pairs += 1
+        if pairs < 2:
+            return "Cần ít nhất 2 cặp (trái | phải)"
+        return None
+
+    if game_type == "word-search":
+        if len(_nonempty_lines(text)) < 2:
+            return "Cần ít nhất 2 từ để tạo bảng"
+        return None
+
+    if game_type in ("paced-quiz", "tug-of-war"):
+        raw = text
+        if game_type == "tug-of-war" and text.startswith("{"):
+            try:
+                import json
+
+                data = json.loads(text)
+                raw = (data.get("raw") or "") if isinstance(data, dict) else text
+            except Exception:
+                raw = text
+        qs = 0
+        for ln in _nonempty_lines(raw):
+            if "|" in ln:
+                qs += 1
+        if qs < 1:
+            return "Cần ít nhất 1 câu hỏi (Câu | Đúng | Sai…)"
+        return None
+
+    if game_type == "html-game":
+        if len(text) < 3:
+            return "Dán mã HTML trước khi lưu"
+        return None
+
+    if game_type in ("countdown", "sleeping-dragon"):
+        return None
+
+    if game_type == "text-profiler":
+        if len(text.split()) < 5:
+            return "Cần đoạn văn dài hơn để lưu (ít nhất ~5 từ)"
+        return None
+
+    return None
+
+
 def _payload_from_body(body: dict):
     game_type = (body.get("type") or "").strip()
     if game_type not in VALID_TYPES:
         return None, "Loại trò chơi không hợp lệ"
     title = (body.get("title") or "").strip() or "Bộ trò chơi mới"
     title = title[:MAX_TITLE]
-    content_text = (body.get("content_text") or body.get("contentText") or "")[:20000]
+    content_text = (body.get("content_text") or body.get("contentText") or "")[:MAX_CONTENT]
 
     doc = {
         "type": game_type,
@@ -93,11 +168,15 @@ def _payload_from_body(body: dict):
         if len(cards) < 1:
             return None, "Cần ít nhất 1 thẻ flashcard"
         doc["flashcards"] = cards
-    else:
+    elif game_type == "crossword":
         cw = _clean_crossword(body.get("crossword_data") or body.get("crosswordData"))
         if not cw:
             return None, "Ô chữ chưa đủ từ / gợi ý"
         doc["crossword_data"] = cw
+    else:
+        err = _validate_tool_content(game_type, content_text)
+        if err:
+            return None, err
 
     return doc, None
 

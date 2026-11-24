@@ -126,8 +126,24 @@ class TtsGenerateSchema(Schema):
     slow = fields.Bool(load_default=False)
 
 
+_GAME_SET_TYPES = (
+    "wheel",
+    "flashcards",
+    "crossword",
+    "name-picker",
+    "match-pairs",
+    "word-search",
+    "paced-quiz",
+    "tug-of-war",
+    "html-game",
+    "countdown",
+    "sleeping-dragon",
+    "text-profiler",
+)
+
+
 class GameSetUpsertSchema(Schema):
-    type = fields.Str(required=True, validate=validate.OneOf(["wheel", "flashcards", "crossword"]))
+    type = fields.Str(required=True, validate=validate.OneOf(list(_GAME_SET_TYPES)))
     title = fields.Str(load_default="Bộ trò chơi mới")
     content_text = fields.Str(load_default="")
     contentText = fields.Str(load_default="")
